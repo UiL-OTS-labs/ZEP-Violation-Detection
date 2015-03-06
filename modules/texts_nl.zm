@@ -1,0 +1,56 @@
+/******************************************************************************\
+FILE:           std_texts_en.zm
+AUTHOR:         Theo Veenker <theo.veenker@beexy.nl>
+ADAPTED BY:     -
+
+DESCRIPTION:
+
+Defines texts on buttons and other graphic elements.
+English version.
+
+
+HISTORY:
+2009-12-02 TV   Created as part of the standard Zep modules.
+2014-08-19 CvR  added some texts for the introduction and pause.
+2014-08-25 AM	Removed standard texts leaving only custom stuff.
+\******************************************************************************/
+
+
+
+// Other texts.
+const string 	  PAUSE_TEXT					= 
+				"Now is the time for a small break.\n"
+				"<i> Hit any button on the button-box when ready to start.</i>";		
+const string	PRACTICE_TOP_TEXT	= "if you hear an incorrect sentence: hit button";
+
+const string			INSTRUCTION_TEXT			= 
+				"<b>Dear participant,</b>\n"
+                "\n"
+                "Thank you for participating in this experiment.\n"
+                "\n"
+                "You are now going to listen to sentences. Some of the "
+                "sentences are incorrect. Your task is to hit "
+                "a button on the button-box as soon as you hear an incorrect sentence"
+                "but to restrain from pressing when the sentence is correct."
+                "Try to react as quickly as possible if you think you hear an incorrect sentence.\n"
+                "\n"
+                "Ocassionaly, a sentence is followed by a yes-or-no question about the previously heard sentence."
+                "After each sentence there's a progress bar to indicate the time left to respond.\n"
+                "\n"
+                "First we will do a short practice.\n"
+                "\n"
+                "<i>Hit any button on the button-box when ready to start.</i>";
+                
+const string			FINAL_INSTRUCTION_TEXT		=
+				"End of the practice part.\n"
+                "\n"
+                "If you have any questions at this moment please ask the "
+                "experimenter now.\n"
+                "\n"
+                "<i>Hit Enter when ready to proceed.</i>";
+                //~ "<i>Hit any button on the button-box when ready to "
+                //~ "proceed.</i>";
+                
+
+                
+

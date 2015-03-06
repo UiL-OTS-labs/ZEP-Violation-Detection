@@ -1,0 +1,63 @@
+/******************************************************************************\
+FILE:           output.zm
+AUTHOR:         Chris van Run <theo.veenker@beexy.nl>
+ADAPTED BY:     -
+
+DESCRIPTION:
+
+Defines the formats of output table(s).
+
+
+HISTORY:
+2014-08-19 CvR   Created.
+\******************************************************************************/
+
+
+// Test output table record.
+record TestOutput
+{
+    int         trialnum;       // trial number
+
+	int         id;             // item id
+    string		test_sentence;
+    ItemType    type;           // item type
+    Grammaticality gram;
+    
+    string		comp_question;
+    string		question_answer;
+    
+    int			rt;
+    int			correct;
+    int			rt_question;
+    int			correct_question;
+}
+
+
+// Test output table.
+TestOutput[..] test_output;
+
+
+//------------------------------------------------------------------------------
+
+void test_output_reset()
+{
+	test_output.size = 0;
+}
+
+// Appends one row of data to test output table.
+void test_output_append(TestOutput data)
+{
+    test_output.size = test_output.size + 1;
+    test_output[test_output.size-1] = data;
+}
+
+
+// Writes test output table contents to CSV file and clears the table.
+void test_output_save(string title, int tbl_nr)
+{
+    // Append table to CSV file (create if non-existent). The filename format
+    // is: <dbname>/<dbnum>/<expname>/<phasename>/ses<sesid>-<tblnum>.csv
+    string fn = expdb.experiment.session.create_table(namespace_name, tbl_nr);
+    test_output.append(fn, namespace_name + title);
+    test_output.size = 0;
+}

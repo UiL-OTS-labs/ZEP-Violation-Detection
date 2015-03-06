@@ -1,0 +1,78 @@
+/******************************************************************************\
+FILE:           advanced_shuffle.zp
+AUTHOR:         Chris van Run (UiL-OTS) <C.P.A.vanRun@uu.nl>
+ADAPTED BY:     -
+
+DESCRIPTION: This module contains the function test_insertation.
+* 
+* This file should be inlcuded with advanced shuffle
+* 
+HISTORY:
+2014-08-08 CvR   Created.
+2014-08-19 CvR   Adapted to work with violdec.
+
+\******************************************************************************/
+
+//======================================================================
+//= V BOW BEFORE THE MIGHTY RULE SET DEFINITIONS! V ====================
+//======================================================================
+
+// stack			What the list look like so far.
+// insert 			The test items that is being tested for insertation.
+// heap				All the left over items
+bool test_insertation(TestItem[] stack, TestItem insert, TestItem[] heap)
+{
+	bool allowed = true;
+	int total_size = stack.size + 1 + heap.size;
+	
+	// ======== handy references:
+	Grammaticality gram = insert.gram;
+	
+	// ======== General rule set:
+	//type in rules governing all the rule_sets
+	if(stack.size == 0)
+		return true;
+		
+	// ======== ItemType specific rule sets
+	//~ i.e. if(type == GRAM)
+	if(gram == INCORRECT && stack[stack.size-1].gram == gram)
+	{
+		allowed = false;
+	}
+	
+	return allowed;
+}
+
+//~ //possibly handy function
+//~ int count_number_of(ItemType type, TestItem[] db, int from  = 0)
+//~ {
+	//~ int count = 0;
+	//~ int index = from;
+	//~ while(index < db.size)
+	//~ {
+		//~ if(db[index].type == type)
+			//~ count++;
+		//~ index++;
+	//~ }
+	//~ 
+	//~ return count;
+//~ }
+//~ 
+//~ //possibly handy function
+//~ int count_number_of(bool type, TestItem[] db, int from  = 0)
+//~ {
+	//~ int count = 0;
+	//~ int index = from;
+	//~ while(index < db.size)
+	//~ {
+		//~ if(db[index].grammatical == type)
+			//~ count++;
+		//~ index++;
+	//~ }
+	//~ 
+	//~ return count;
+//~ }
+
+//======================================================================
+//= ^ THOU SHALL THINK HARD HOW TO DEFINE SAID RULE SETS ^ =============
+//======================================================================

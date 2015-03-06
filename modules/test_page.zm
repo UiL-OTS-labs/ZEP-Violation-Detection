@@ -1,0 +1,284 @@
+/******************************************************************************\
+FILE:           test_page.zm
+AUTHOR:         Theo Veenker <theo.veenker@beexy.nl>
+ADAPTED BY:     Chris van Run
+
+DESCRIPTION:
+
+Provides a page object to show to the participant during test trials.
+It handles presenting the stimulus and recording the participant's response.
+
+
+HISTORY:
+2011-10-25 TV   Created.
+2014-08-19 CvR  Adjusted to incorporate button box.
+
+\******************************************************************************/
+
+import std_sound_output_device;
+
+
+Page test_page
+{
+    TestItem    item;           // trial control parameters
+    
+    init()
+    {
+        fill_pattern_color = TEST_PAGE_COLOR;
+    }
+
+    on_event:key_press()
+    {
+        // Handle space and Enter keys.
+        if (input_key == ' ' || input_key == KEY_Return)
+            response.process_hit(event_time);
+        else
+            handle_special_key(this, input_key, input_modifiers);
+    }
+
+
+    on_event:message()
+    {
+		if(message_sender == control)
+		{
+			// Process button-box message. See setup() below.
+			response.process_hit(event_time);
+		}
+    }
+
+
+    VerticalLayout layout
+    {
+        init()
+        {
+            spacing = 50;
+            height = 0;     // 0 means as large as possible
+        }
+
+
+        ProgressBarGadget bar
+        {
+            init()
+            {
+                fill_pattern_color = TEST_PAGE_STIMULUS_COLOR;
+                bar_color = color:steelblue;
+                hor_alignment = ALIGN_END;
+                margin = PROGRESS_BAR_MARGIN;
+                size = PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT;
+                is_reversed = true;
+            }
+			
+			void set_color(color new)
+			{
+				bar_color = new;
+			}
+
+            on_event:pre_start()
+            {
+                value = 1;
+            }
+
+
+            on_event:pre_finish()
+            {
+                value = 0;
+            }
+            
+            on_event:pre_update()
+            {
+                value = 1 - real(relative_frame) / expected_num_frames;
+            }
+        }
+
+
+        void start_bar(time t)
+        {
+            // Start time-out bar.
+            bar.start(t, RESPONSE_DURATION);
+        }
+
+
+        void reset()
+        {
+            full_abort();
+            bar.set_color(color:steelblue);
+        }
+    }
+
+
+    SoundChain audio
+    {
+        // Sound source/producer object.
+        SoundFile clip {}
+
+
+        // Sound sink/consumer object.
+        SoundPlayback playback {}
+
+
+        void play(time tstart)
+        {
+            abort();
+
+            playback.device = sound_output_device;
+            clip.file = stimuli_dir() + "sounds/" + item.id + ".wav";
+
+            start(tstart);
+        }
+    }
+
+
+    Response response
+    {
+        // Response data.
+        int     rt;             // response time [ms]
+        bool    correct;        // correct response: 0=no, 1=yes
+
+
+        void clear()
+        {
+            rt = -1;         // -9999 means no response
+            correct = -1;
+        }
+
+
+        void process_hit(time t)
+        {
+            HitType validity = hit(t);
+
+            // Accept the first hit in the response interval and wait until
+            // the response interval is over.
+            if (validity == HIT_VALID)
+            {
+				layout.bar.set_color(color:cud_orange);
+				
+                rt = int(reaction_time(0));
+
+                // Giving a response for an item of type FILLER1 is incorrect,
+                // for other types it is the correct response.
+                correct = item.gram == INCORRECT;
+
+                ignore_remaining_hits();
+    
+            }
+            else if (validity == HIT_TOO_EARLY || validity == HIT_TOO_LATE)
+            {
+                // False alarm. Deal with this if desired.
+            }
+        }
+
+
+        on_event:finish()
+        {
+            // Not giving a response for an item of type FILLER1 is correct.
+            if (num_valid_hits == 0){
+                correct = item.gram == CORRECT;
+				}
+            real correctness = correct ? 1 : -1;
+            if (!test_page_overlay.start_feedback(this, correctness, 
+                    FEEDBACK_DURATION)) 
+                done(CONTINUE);
+        }
+
+
+        on_event:message()
+        {
+            done(CONTINUE);
+        }
+    }
+
+
+    // Aborts any ongoing activity on this page and signals the initiator
+    // of the trial that we're done.
+    void done(int msgid)
+    {
+        // Just in case; abort presentation if still active.
+        audio.abort();
+        layout.reset();
+
+        signal_target(msgid);   // tell caller we're done
+        target = null;
+
+        control.clear_status();
+    }
+
+
+    //==========================================================================
+
+
+    // Performs preparatory work required before using this page.
+    void setup(int ntrials=-1, bool fb=false, bool pr=false)
+    {
+        test_page_overlay.setup(this);
+
+        // Show or hide prompt.
+        test_page_overlay.show_prompt(pr ? PRACTICE_TOP_TEXT : "");
+
+        // Enable or disable the progress bar.
+        test_page_overlay.show_progress_bar(ntrials);   // disabled if < 0
+
+        // Enable or disable feedback.
+        test_page_overlay.enable_feedback(fb);          // disabled if false
+    }
+
+
+    // Performs cleaning up if necessary.
+    void cleanup()
+    {
+        test_page_overlay.cleanup();
+
+        control.button_box.disable_buttons();
+        control.target = null;
+    }
+
+
+    // Starts a trial.
+    void action(Object caller, TestItem it, time tref, int count=-1)
+    {
+        // Save the passed trial control parameters.
+        item = it;
+
+
+        // Show this page (if not yet done) and make tref the trial start time.
+        tref = test_window1.show_test_page(this, tref + INTERTRIAL_INTERVAL);
+
+
+        // Reset response data.
+        response.clear();
+
+
+        // Start the sound stimulus. Duration depends on actual length of 
+        // the sound file being played.
+        audio.play(tref);
+
+
+        // Response interval starts at stimulus onset. Timeout at
+        // stimulus offset plus RESPONSE_DURATION.
+        response.start(audio.expected_start_time, 
+            audio.expected_finish_time + RESPONSE_DURATION);
+
+        // Start at stimulus offset. It will finish at response interval end.
+        layout.start_bar(audio.expected_finish_time);
+
+
+        // Update progress counter (if enabled).
+        test_page_overlay.update_progress_bar(count);
+
+
+        // Update status line on control window. Cleared in done() above.
+        control.set_status(
+            string(item.id) + "  " + 
+            string(item.type) + "  " + 
+            string(item.gram) + "  " +
+            string(item.question_answer));
+
+
+        // Remember who to signal when the trial is over.
+        target = caller;
+        
+           // Enable button-box buttons.
+        control.target = this;
+        control.button_box.disable_buttons();
+        control.button_box.enable_all_buttons(CONTINUE);
+    }
+}

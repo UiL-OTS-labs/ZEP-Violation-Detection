@@ -1,0 +1,129 @@
+/******************************************************************************\
+FILE:           violdec.zp
+AUTHOR:         Chris van Run <C.P.A.vanRun@uu.nl>
+ADAPTED BY:     Alex T. Manus <A.T.Manus@uu.nl>
+
+DESCRIPTION:
+* Experiment that presents an audio stimulus which is a sentence. 
+The sentences are correct or incorrect and the participants is to hit a 
+button when the sentence is incorrect. An optional yes-or-no comprehension 
+question might be asked following a sentence. A progress bar is shown during a 
+trial that signifies how much time is left for the participant to respond.
+
+HISTORY:
+2014-08-19 CvR   Created.
+2014-08-25 AM	 Modified to make language switching easier.
+
+\******************************************************************************/
+
+requires 1.10;
+
+//globaly used modules
+import std_windows1;
+import std_entry_page1;
+import std_exit_page1;
+
+import std_blank_page;
+
+//Language modules, uncomment the ones appropriate to your language.
+//import std_texts_en;
+//import texts_en;
+import std_texts_nl;
+import texts_nl;
+
+import pause_page;
+import choose_1of2_page;
+import stimuli;
+import test_page;
+
+import practice::practice_block;
+import test::test_block;
+
+
+
+Experiment experiment
+{
+    on_event:entry()
+    {
+		      control.button_box.open();
+
+        // If necessary set parallel port line D0 to power button box device.
+		control.button_box.output(0x02);
+		
+        show_test_windows();
+    }
+
+
+    on_event:message()
+    {
+        // On Ctrl+F4 jump unconditionally to the thank-you part.
+        if (message_sender == control && message_arg == SYS_STOP)
+        {
+            control.mark_experiment_aborted();
+            thankyou.enter();
+        }
+    }
+
+    Part welcome
+    {
+        on_event:entry()
+        {
+            entry_page.set_text(WELCOME_TEXT);
+            entry_page.action(this, 0s);
+        }
+    }
+
+	 Part
+    {
+        on_event:entry()
+        {
+			blank_page.fill_pattern_color = INFO_PAGE_COLOR;
+            blank_page.action_auto(this, 500ms);
+        }
+    }
+    
+	Part phase1
+    {
+        on_event:entry()
+        {
+            practice::action(this);
+        }
+    }
+    
+    Part
+    {
+        on_event:entry()
+        {
+			blank_page.fill_pattern_color = INFO_PAGE_COLOR;
+            blank_page.action_auto(this, 500ms);
+        }
+    }
+    
+    Part phase2
+    {
+        on_event:entry()
+        {
+            test::action(this);
+        }
+    }
+	
+	 Part
+    {
+        on_event:entry()
+        {
+			blank_page.fill_pattern_color = INFO_PAGE_COLOR;
+            blank_page.action_auto(this, 500ms);
+        }
+    }
+    
+    Part thankyou
+    {
+        on_event:entry()
+        {
+            control.end_experiment();   // Check-in session.
+
+            exit_page.set_text(THANK_YOU_TEXT);
+            exit_page.action(this, 10s);
+        }
+    }
+}

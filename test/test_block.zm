@@ -1,0 +1,174 @@
+/******************************************************************************\
+FILE:           test_block.zm
+AUTHOR:         Chris van Run <C.P.A.vanRun@uu.nl>
+ADAPTED BY:     -
+
+DESCRIPTION: Contains the test_block
+
+HISTORY:
+2014-08-19 CvR   Created.
+
+\******************************************************************************/
+
+requires 1.10;
+import advanced_shuffle;
+
+Block test_block
+{
+    Block test
+    {
+        TestItem[..] 	test_items;
+        TestItem		item;   // current item
+		
+		string 		split_points; // for pauses
+
+        on_event:entry()
+        {
+			test_page.hide_cursor();
+			choose_1of2_page.hide_cursor();
+
+			// Load test items table.
+            if (load_stimuli(test_items, "test_items.csv") != OK) terminate;
+			
+            // Randomize test items table.
+            if (advanced_shuffle(test_items) != OK) terminate;
+            num_cycles = test_items.size;
+
+            // Prepare test page: progress bar enabled, feedback and prompt 
+            // disabled.
+            test_page.setup(num_cycles, false, false);
+            
+            //set up the pause points
+            // Create array with all splitpoints
+			int i = 1; // Iterator
+			while(i <= NUMBER_OF_PAUSES)
+			{
+				real fraq = real(i) / real(NUMBER_OF_PAUSES + 1);
+				split_points += ";" + string(floor(fraq * (test_items.size - 1))) + ";";
+				i++;
+			}
+        }
+
+
+        on_event:exit()
+        {
+            test_page.cleanup();
+
+            // Save test output table as CSV file.
+            test_output_save(": Test results :", 1);
+            test_page.show_cursor();
+            choose_1of2_page.show_cursor();
+        }
+
+
+        Trial trial
+        {
+            on_event:entry()
+            {
+                item = test_items[test.cycle];
+            }
+
+            on_event:exit()
+            {
+                TestOutput 	output;
+                // Add new row to test output table;
+                output.trialnum = test.cycle + 1;
+				output.id = item.id;
+				output.test_sentence = item.test_sentence;
+                output.type = item.type;
+				output.gram = item.gram;
+				output.comp_question = item.comp_question;
+				output.question_answer = item.question_answer;
+				output.rt = test_page.response.rt;
+                output.correct = test_page.response.correct;
+                if(length(output.comp_question) > 0)
+                {
+					output.rt_question = choose_1of2_page.response.rt;
+					output.correct_question = choose_1of2_page.response.correct;
+				}
+                test_output_append(output);
+            }
+            
+            SubTrial presentation
+            {
+                on_event:entry()
+                {
+                    test_page.action(this, item, reference_time, test.cycle);
+                }
+                
+                on_event:exit()
+				{
+					test_page.cleanup();
+				}
+            }
+
+            TransientPart
+            {
+                on_event:entry()
+                {
+                    // Check if we need to ask a comprehension question.
+                    if (length(item.comp_question) == 0)
+                        shortbreak.enter();  // No question. Trial done.
+                }
+            }		
+
+            SubTrial question
+            {
+                on_event:entry()
+                {
+                    choose_1of2_page.set_text(item.comp_question);
+                    choose_1of2_page.set_label_texts(YES_BUTTON_TEXT, NO_BUTTON_TEXT);
+                    choose_1of2_page.set_keys(KEY_Shift_L, KEY_Shift_R);
+                    choose_1of2_page.action(this, item.question_answer == "y" ? 1 : 2);
+                }
+            }
+            
+			TransientPart shortbreak
+			{
+			   on_event:entry()
+			   {
+				   if(find_key(split_points, (";" + string(test.cycle) + ";") ) != -1)
+				   {
+					   // Call break if a test page should be shown
+					   actualbreak.enter();
+				   } 
+				   else 
+				   {
+					   // Ensure actualbreak isn't called if a
+					   // pause page should not be used.
+					   trial.next_cycle();
+				   }
+			   }
+			}
+			
+			SubTrial actualbreak
+			{
+			   on_event:entry()
+			   {
+				   pause_page.set_text(PAUSE_TEXT, true);
+				   pause_page.layout.ok.is_visible = false; 
+				   pause_page.action(this);
+				   pause_page.checkkeys = false;
+				   non_response_period.start(now()+3s);  
+			   }
+			}
+			
+			Timer non_response_period
+			{
+				on_event:expire()
+				{
+					pause_page.checkkeys = true;
+					pause_page.layout.ok.is_visible = true; 
+				}
+			}
+		}
+	}
+}
+
+
+void action(Part caller)
+{
+    // Activate the task. When the task is done, the registered caller
+    // (c.q. the main experiment object) will automatically be signalled.
+    test_block.enter(caller);
+}

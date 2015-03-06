@@ -1,0 +1,279 @@
+/******************************************************************************\
+FILE:           advanced_shuffle.zp
+AUTHOR:         Chris van Run (UiL-OTS) <C.P.A.vanRun@uu.nl>
+ADAPTED BY:     -
+
+DESCRIPTION: This advanced shuffle uses a shuffle followed by a depth-first repair that transverses from top to bottom.
+* When an item is not allowed (defined by rule set) it attempts to switch it with one of the items that are not 'repaired' yet (aka the heap).
+* If none of the heap items are a legal replacement for the item a backtrack is made.
+* There are a maximum amount of backtracks allowed before the advanced-shuffle algorithm gives up on the current shuffle and reshuffles.
+* There are a maximum amount of reshuffles allowed before the advanced-shuffle algorithm brakes down and starts to cry ;).
+*
+* NOTE: Changes should be, in principle, be made in the rule_set.zm only!
+
+HISTORY:
+2014-08-08 CvR   Created.
+
+\******************************************************************************/
+
+import std_defs; // for ERROR and the like
+import rule_set;
+
+enum MaskType
+{
+	UNMASKED,
+	MASKED,
+	EXPLORED,
+}
+
+int MAX_BACKTRACKS;
+int MAX_RESETS;
+
+const string print_spacer = "-"; // used for printing
+
+// main function call.
+// target 			is that which is being shuffled
+// print_tree 		controls if printouts are made of the build (false)
+// max_backtracks 	is the maximum number of repairs or backtracks the algorithm is allowed to make (50)
+// max_resets 		is the maximum number of new insertations (with a new order) the algorithm is allowed to make (50)
+
+// returns OK (0) if we succesfully shuffled
+// returns ERROR (-1) if we succesfully shuffled
+
+int advanced_shuffle(TestItem[] target, bool print_tree = false, int max_backtracks = 50, int max_resets = 50)
+{
+	int main_progress = OK;
+	
+	MaskType[..][..] mask; // holds the mask per option
+	TestItem[..] stack;
+	
+	bool found = false;
+	
+	MAX_RESETS = max_resets;
+	
+	while(main_progress == OK && MAX_RESETS > 0 && !found)
+	{
+			if(print_tree)
+			{
+				println("=       Trying NEW insertation order          =");
+				println("===============================================");
+			}
+			int sub_progress = OK;
+			
+			//reset all the relevant stuff
+			mask.size = 0;
+			mask.size = target.size + 1;
+			stack.size = 0;
+			MAX_BACKTRACKS = max_backtracks;
+	
+			// shuffle the target so the insertation is random (main reason for a reset)
+			target.shuffle(0,-1);
+	
+			// start building the stack based on target
+			while(stack.size < target.size && sub_progress == OK)
+			{
+				if(MAX_BACKTRACKS <= 0)
+				{
+					if(print_tree)
+					{
+						println("===============================================");
+						println("=          Maximum repairs tried              =");
+					}
+					sub_progress = ERROR;
+					break;
+				}
+					
+				int depth = stack.size;
+				mask[depth].size = target.size; //reset if size is 0, otherwise it keeps it intact
+				
+				bool expanded = expand(stack, target, mask, print_tree);
+				
+				if(!expanded) // ups, no expansion: we ran out of options
+				{					
+					//shrink
+					bool shrink = shrink(stack, mask, print_tree);
+					if(!shrink) // ups, failed to shrink!
+					{
+						println("At seed of stimulus-order shuffle tree without any options! Check your rule set!");
+						sub_progress = ERROR; // this sub has failed
+						main_progress = ERROR; // and since it failed horribly, no use continuing!
+						break;
+					}
+				}
+			} //<--- sub_progress while loop
+			
+			if(sub_progress == OK)
+			{
+				found = true;
+				break;
+			}
+			MAX_RESETS = MAX_RESETS - 1;
+		} //<--- main_progress while loop
+		
+		if(print_tree)
+		{
+			println("=     Stopped trying, please don't be mad     =");
+			println("===============================================");
+		}
+
+		if(found)
+		{
+			if(print_tree)
+				println("FOUND");
+			
+			// copy the new stack into the target
+			int index = 0;
+			while(index < stack.size)
+			{
+				target[index] = stack[index];
+				index++;
+			}
+			return OK;
+		}
+		
+		// else:
+		return ERROR;
+}
+
+// Retrieves a legal new insertation to be put on the stack, increases the stack and updates the new mask of the depth.
+// returns whether a stack was succesfully increased.
+bool expand(TestItem[] stack, TestItem[] target, MaskType[][] mask, bool print_tree)
+{
+		int depth = stack.size;
+		
+		int index = get_next_insertation(stack, target, mask, print_tree);
+		
+		if(index == ERROR)
+			return false;
+		else
+		{
+			// append to the stack
+			stack.size = stack.size + 1;
+			stack[stack.size-1] = target[index];
+			
+			//copy the mask at successfull expansion to the next depth
+			mask[depth+1].size = 0;
+			mask[depth+1].size = target.size;
+			
+			int mask_index = 0;
+			while(mask_index < mask[depth].size)
+			{
+				if(mask[depth][mask_index] == MASKED) // so any EXPLORED are excluded
+					mask[depth+1][mask_index] = MASKED;
+				mask_index++;
+			}
+				// set the mask at new depth to prevent re-insertation
+			mask[depth+1][index] = MASKED;
+				
+			if(print_tree) println(make_prefix(depth, print_spacer) + "d" + string(depth) + ":i" + index);
+		}
+			return true;		
+}
+
+// shrink the stack by removing it's top item and marking the item in the relevant masks (depth = current stack size - 1) as EXPLORED.
+// returns wheter the removal was succesful
+bool shrink(TestItem[] stack, MaskType[][] mask, bool print_tree)
+{
+	if(print_tree) println(make_prefix(stack.size,print_spacer) + "<");
+	
+	// count the backtracks;
+	MAX_BACKTRACKS = MAX_BACKTRACKS - 1;
+	
+	// if we are still at the start we cannot continue
+	if(stack.size == 0)
+		return 0;
+				
+	// change the depth to target previous depth
+	stack.size = stack.size-1;
+	int depth = stack.size;
+	
+	// set the previous chosen option on EXPLORED
+	int index = index_of_left(UNMASKED, depth, mask);
+	mask[depth][index] = EXPLORED;
+	
+	return true;
+}
+
+// tries to get a new insertation, return -1 (ERROR) if there are no suitable unmasked items.
+int get_next_insertation(TestItem[] stack, TestItem[] target, MaskType[][] mask, bool print_tree)
+{
+	int depth = stack.size;
+	
+	int index = 0;
+	bool found = false;
+	while(index < mask[depth].size && !found)
+	{
+		if(mask[depth][index] == UNMASKED) // legal option
+		{
+			// create the heap (the other options then this one)
+			int target_index = 0;
+			TestItem[..] heap;
+			while(target_index < target.size && target_index != index) // != index to ensure that we exclude the current one under scrutiny
+			{
+				if(mask[depth][target_index] != MASKED)
+				{
+					heap.size = heap.size + 1;
+					heap[heap.size-1] = target[target_index];
+				}
+				target_index++;
+			}
+			
+			bool allowed = test_insertation(stack, target[index], heap); // test the ruleset
+			if(allowed)
+			{
+				found = true;
+				break;
+			}
+			else
+			{	
+				// Mark the option as explored
+				mask[depth][index] = EXPLORED;
+				if(print_tree) println(make_prefix(depth, print_spacer) + "d" + depth+ "Xi" + index);	
+			}
+		}
+		index++;
+	}
+	
+	// if none were found, we should sad face.
+	if(!found)
+	{
+		return ERROR;
+	}
+	return index;
+}
+
+// returns the index of the first MaskType-mtype item in maskType array mask[depth].
+int index_of_left(MaskType mtype, int depth, MaskType[][] mask)
+{
+	int index = 0;
+	bool found = false;
+	
+	while(index < mask[depth].size && !found)
+	{
+		if(mask[depth][index] == mtype)
+		{
+			found = true;
+			break;
+		}
+		else
+			index++;
+	}
+	
+	if(!found)
+		return ERROR;
+		
+	return index;
+}
+
+// only used for printing. repeats a string depth times.
+string make_prefix(int depth, string sep)
+{
+	string result = "";
+	int index = 0;
+	while(index < depth)
+	{
+		result = result + sep;
+		index++;
+	}
+	return result;
+}

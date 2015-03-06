@@ -1,0 +1,71 @@
+/******************************************************************************\
+FILE:           stimuli.zm
+AUTHOR:         Theo Veenker <theo.veenker@beexy.nl>
+ADAPTED BY:     Chris van Run <C.P.A.vanRun@uu.nl>
+
+DESCRIPTION:
+
+Defines the formats of item table(s) and provides the actual content of
+the item table(s) i.e. stimulus information.
+
+
+HISTORY:
+2011-10-25 TV   Created.
+2014-08-19 CvR  Adapted for violdec.
+
+\******************************************************************************/
+
+
+// Symbolic definition of item type.
+enum ItemType
+{
+    FILLER,                    // filler without real word
+    CRITICAL
+}
+
+enum Grammaticality
+{
+	INCORRECT,
+	CORRECT
+}
+
+// Item table record.
+record TestItem
+{
+    int         id;             // item id
+    string		test_sentence;
+    ItemType    type;           // item type
+    Grammaticality gram;
+    
+    string		comp_question;
+    string		question_answer;
+}
+
+// Loads item table(s) from CSV file(s) in the stimuli folder.
+int load_stimuli(TestItem[] target, string filename)
+{
+    int err;
+    
+	// Load data into test_prac_items table.
+    err =  target.load(stimuli_dir() + filename, 
+        true,           // if true, file contains a header row
+        0);             // number of lines to skip before header and data
+    if (err) return err;
+
+    return OK;
+}
+
+// simple print of the test Item array.
+void print_TestItem_array(TestItem[] test_items)
+{
+    int n;
+    int nitems = test_items.size;
+    while (n < nitems)
+    {
+        println(
+            string(n) + "\t" +
+            string(test_items[n].type) + "\t" +
+            string(test_items[n].gram));
+        n++;
+    }
+}

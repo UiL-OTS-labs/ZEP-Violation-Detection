@@ -1,0 +1,169 @@
+/******************************************************************************\
+FILE:           practice_block.zm
+AUTHOR:         Chris van Run <C.P.A.vanRun@uu.nl>
+ADAPTED BY:     -
+
+DESCRIPTION: Contains the practice_block
+
+HISTORY:
+2014-08-19 CvR   Created.
+
+\******************************************************************************/
+
+requires 1.10;
+
+import pause_repeat_continue_page;
+
+Block practice_block
+{
+	on_event:exit()
+        {
+            test_page.cleanup();
+
+            // Save test output table as CSV file.
+            test_output_save(": Practice results :", 2);
+            test_output_reset();
+        }
+        
+	 Part instructions
+    {
+        on_event:entry()
+        {
+//            pause_page.set_text_size(1000, 600);
+
+            pause_page.set_text(INSTRUCTION_TEXT, true);
+            pause_page.action(this);
+            control.button_box.enable_all_buttons(CONTINUE);
+        }
+        
+        on_event:exit()
+        {
+			// clean up
+			control.button_box.disable_buttons();
+		}
+    }
+    
+     Part
+    {
+        on_event:entry()
+        {
+			blank_page.fill_pattern_color = INFO_PAGE_COLOR;
+            blank_page.action_auto(this, 500ms);
+        }
+    }
+    
+    Block practice
+    {
+        TestItem[..] 	test_items;
+        TestItem		item;   // current item
+
+        on_event:entry()
+        {
+			// Load test items table.
+            if (load_stimuli(test_items, "prac_items.csv") != OK) terminate;
+			
+            num_cycles = test_items.size;
+
+            // Prepare test page: progress bar enabled, feedback and prompt 
+            // disabled.
+            test_page.setup(num_cycles, true, true);
+        }
+		
+		on_event:exit()
+        {
+            test_page.cleanup();
+		}
+
+        Trial trial
+        {
+            on_event:entry()
+            {
+                item = test_items[practice.cycle];
+            }
+
+            on_event:exit()
+            {
+                TestOutput 	output;
+                // Add new row to test output table;
+                output.trialnum = practice.cycle + 1;
+				output.id = item.id;
+				output.test_sentence = item.test_sentence;
+                output.type = item.type;
+				output.gram = item.gram;
+				output.comp_question = item.comp_question;
+				output.question_answer = item.question_answer;
+				output.rt = test_page.response.rt;
+                output.correct = test_page.response.correct;
+                if(length(output.comp_question) > 0)
+                {
+					output.rt_question = choose_1of2_page.response.rt;
+					output.correct_question = choose_1of2_page.response.correct;
+				}
+                test_output_append(output);
+            }
+            
+            SubTrial presentation
+            {
+                on_event:entry()
+                {
+                    test_page.action(this, item, reference_time, practice.cycle);
+                }
+            }
+
+            TransientPart
+            {
+                on_event:entry()
+                {
+                    // Check if we need to ask a comprehension question.
+                    if (length(item.comp_question) == 0)
+                        trial.next_cycle();  // No question. Trial done.
+                }
+            }		
+
+            SubTrial question
+            {
+                on_event:entry()
+                {
+                    choose_1of2_page.set_text(item.comp_question);
+                    choose_1of2_page.set_label_texts(YES_BUTTON_TEXT, NO_BUTTON_TEXT);
+                    choose_1of2_page.set_keys(KEY_Shift_L, KEY_Shift_R);
+                    choose_1of2_page.action(this, item.question_answer == "y" ? 1 : 2);
+                }
+            }
+		}
+	}
+	
+	 Part
+    {
+        on_event:entry()
+        {
+            blank_page.action_auto(this, 500ms);
+        }
+    }
+    
+     Part final_instructions
+    {
+        on_event:entry()
+        {
+//            pause_page.set_text_size(1000, 600);
+
+            pause_repeat_continue_page.set_text(FINAL_INSTRUCTION_TEXT, true);
+            pause_repeat_continue_page.action(this, 0s, -1s, 500ms, true, 2s, practice_block);
+            control.button_box.enable_all_buttons(CONTINUE);
+        }
+        
+        on_event:exit()
+        {
+			// clean up
+			control.button_box.disable_buttons();
+		}
+    }
+}
+
+
+void action(Part caller)
+{
+    // Activate the task. When the task is done, the registered caller
+    // (c.q. the main experiment object) will automatically be signalled.
+    practice_block.enter(caller);
+}
