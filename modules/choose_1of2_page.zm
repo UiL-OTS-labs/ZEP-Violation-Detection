@@ -259,7 +259,7 @@ Page choose_1of2_page
         control.button_box.disable_buttons();
           
         control.button_box.enable_button(0, 1); // button 0 --> 0
-        control.button_box.enable_button(1, 2); // button 1 --> 1
+        control.button_box.enable_button(2, 2); // button 1 --> 1
         
         target = caller;
 
